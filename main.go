@@ -1,14 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"time"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	language "cloud.google.com/go/language/apiv1"
+	storage "cloud.google.com/go/storage"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
 	"golang.org/x/net/context"
@@ -20,6 +23,9 @@ var (
 	consumerSecret = flag.String("consumer-secret", "", "Twitter Consumer Secret")
 	accessToken    = flag.String("access-token", "", "Twitter Access Token")
 	accessSecret   = flag.String("access-secret", "", "Twitter Access Secret")
+	analyzeEvery = flag.Duration("analyze-every", 20*time.Second, "Frequency to send requests to NLP API")
+	bucket = flag.String("bucket", "", "GCS bucket to write output to")
+	object = flag.String("object", "", "GCS object to write output to")
 )
 
 func main() {
@@ -32,11 +38,16 @@ func main() {
 
 	// Google NLP Client
 	ctx := context.Background()
-	c, err := language.NewClient(ctx)
+	l, err := language.NewClient(ctx)
 	if err != nil {
-		log.Fatalf("Setting up Cloud client: %v", err)
+		log.Fatalf("Setting up Language client: %v", err)
 	}
-	a := analyzer{c}
+	// Google Storage Client
+	s, err := storage.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Setting up GCS client: %v", err)
+	}
+	a := &analyzer{l: l, s: storer{s}}
 
 	stream, err := client.Streams.Sample(&twitter.StreamSampleParams{
 		Language:      []string{"en"}, // Only English.
@@ -64,12 +75,20 @@ func main() {
 }
 
 type analyzer struct {
-	client *language.Client
+	l *language.Client
+	s storer
+	nextUpdate time.Time
+	lastHour []float32
 }
 
-func (a analyzer) Analyze(t *twitter.Tweet) {
+func (a *analyzer) Analyze(t *twitter.Tweet) {
+	// Don't analyze this tweet, too soon.
+	if time.Now().Before(a.nextUpdate) {
+		return
+	}
+
 	ctx := context.Background()
-	resp, err := a.client.AnalyzeSentiment(ctx, &lpb.AnalyzeSentimentRequest{
+	resp, err := a.l.AnalyzeSentiment(ctx, &lpb.AnalyzeSentimentRequest{
 		Document: &lpb.Document{
 			Type:   lpb.Document_PLAIN_TEXT,
 			Source: &lpb.Document_Content{t.Text},
@@ -80,4 +99,33 @@ func (a analyzer) Analyze(t *twitter.Tweet) {
 		return
 	}
 	log.Println("Sentiment:", resp.DocumentSentiment.Score)
+	a.lastHour = append(a.lastHour, resp.DocumentSentiment.Score)
+	// Only keep last hour worth of data, so trim the oldest item.
+	// For sample rate of 20s, lastHour will be 180 points long.
+	if len(a.lastHour) > int(time.Hour / *analyzeEvery) {
+		a.lastHour = a.lastHour[1:]
+	}
+	a.nextUpdate = time.Now().Add(*analyzeEvery)
+
+	go a.s.update(a.lastHour)
+}
+
+type storer struct {
+	s *storage.Client
+}
+
+// update updates the object in GCS with latest data.
+// TODO: Write the object with content/type and cache-control headers.
+func (s storer) update(data []float32) {
+	ctx := context.Background()
+	w := s.s.Bucket(*bucket).Object(*object).NewWriter(ctx)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Println("JSON error: %v", err)
+		return
+	}
+	if err := w.Close(); err != nil {
+		log.Println("GCS error: %v", err)
+		return
+	}
+	log.Println("Updated GCS")
 }
