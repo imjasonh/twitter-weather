@@ -47,6 +47,12 @@ func main() {
 		flagFromMetadata("bucket")
 		flagFromMetadata("object")
 	}
+	log.Println("consumer-key", *consumerKey)
+	log.Println("consumer-secret", *consumerSecret)
+	log.Println("access-token", *accessToken)
+	log.Println("access-secret", *accessSecret)
+	log.Println("bucket", *bucket)
+	log.Println("object", *object)
 
 	// TODO: Recover from crashes by reading lastHour from data in GCS.
 
