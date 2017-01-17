@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"time"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	language "cloud.google.com/go/language/apiv1"
 	storage "cloud.google.com/go/storage"
 	"github.com/dghubble/go-twitter/twitter"
@@ -23,13 +24,31 @@ var (
 	consumerSecret = flag.String("consumer-secret", "", "Twitter Consumer Secret")
 	accessToken    = flag.String("access-token", "", "Twitter Access Token")
 	accessSecret   = flag.String("access-secret", "", "Twitter Access Secret")
-	analyzeEvery = flag.Duration("analyze-every", 20*time.Second, "Frequency to send requests to NLP API")
-	bucket = flag.String("bucket", "", "GCS bucket to write output to")
-	object = flag.String("object", "", "GCS object to write output to")
+	analyzeEvery   = flag.Duration("analyze-every", 20*time.Second, "Frequency to send requests to NLP API")
+	bucket         = flag.String("bucket", "", "GCS bucket to write output to")
+	object         = flag.String("object", "", "GCS object to write output to")
 )
+
+func flagFromMetadata(k string) {
+	mdv, err := metadata.Get(k)
+	if mdv != "" && err == nil {
+		flag.Set(k, mdv)
+	}
+}
 
 func main() {
 	flag.Parse()
+
+	if metadata.OnGCE() {
+		flagFromMetadata("consumer-key")
+		flagFromMetadata("consumer-secret")
+		flagFromMetadata("access-token")
+		flagFromMetadata("access-secret")
+		flagFromMetadata("bucket")
+		flagFromMetadata("object")
+	}
+
+	// TODO: Recover from crashes by reading lastHour from data in GCS.
 
 	// Twitter Client
 	client := twitter.NewClient(
@@ -75,10 +94,10 @@ func main() {
 }
 
 type analyzer struct {
-	l *language.Client
-	s storer
+	l          *language.Client
+	s          storer
 	nextUpdate time.Time
-	lastHour []float32
+	lastHour   []float32
 }
 
 func (a *analyzer) Analyze(t *twitter.Tweet) {
@@ -116,7 +135,7 @@ type storer struct {
 
 type gcsData struct {
 	Timestamp time.Time `json:"timestamp"`
-	Data []float32 `json:"data"`
+	Data      []float32 `json:"data"`
 }
 
 // update updates the object in GCS with latest data.
@@ -135,7 +154,7 @@ func (s storer) update(data []float32) {
 	}
 
 	if _, err := o.Update(ctx, storage.ObjectAttrsToUpdate{
-		ContentType: "application/json",
+		ContentType:  "application/json",
 		CacheControl: "max-age=59", // Cache for <60s.
 	}); err != nil {
 		log.Println("GCS update error: %v", err)
