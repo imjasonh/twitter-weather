@@ -13,7 +13,7 @@ import (
 	"cloud.google.com/go/compute/metadata"
 	language "cloud.google.com/go/language/apiv1"
 	storage "cloud.google.com/go/storage"
-	"github.com/dghubble/go-twitter/twitter"
+	"github.com/ImJasonH/go-twitter/twitter" // TODO: dghubble/go-twitter after https://github.com/dghubble/go-twitter/pull/46
 	"github.com/dghubble/oauth1"
 	"golang.org/x/net/context"
 	lpb "google.golang.org/genproto/googleapis/cloud/language/v1"
@@ -30,7 +30,7 @@ var (
 )
 
 func flagFromMetadata(k string) {
-	mdv, err := metadata.Get(k)
+	mdv, err := metadata.InstanceAttributeValue(k)
 	if mdv != "" && err == nil {
 		flag.Set(k, mdv)
 	}

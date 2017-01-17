@@ -1,18 +1,15 @@
 #!/bin/bash
 
 source config
-echo $CONSUMER_KEY $CONSUMER_SECRET $ACCESS_TOKEN $ACCESS_SECRET $BUCKET $OBJECT
-
-PROJECT=twitter-weather
-INSTANCE=instance
-ZONE=us-east1-b
+export PROJECT=twitter-weather
+export INSTANCE=instance
+export ZONE=us-central1-f
 
 # Delete the VM if it exists.
-gcloud --project=$PROJECT compute instances delete "$INSTANCE" --zone="$ZONE" --quiet || true
+gcloud --project=$PROJECT compute instances delete "$INSTANCE" --zone="$ZONE" || true
 
 # Create a new VM.
 gcloud --project=$PROJECT compute instances create "$INSTANCE" \
-  --quiet \
   --machine-type=f1-micro \
   --zone="$ZONE" \
   --subnet=default \
@@ -22,4 +19,5 @@ gcloud --project=$PROJECT compute instances create "$INSTANCE" \
   --boot-disk-type=pd-standard \
   --boot-disk-device-name="$INSTANCE" \
   --metadata consumer-key="$CONSUMER_KEY",consumer-secret="$CONSUMER_SECRET",access-token="$ACCESS_TOKEN",access-secret="$ACCESS_SECRET",bucket="$BUCKET",object="$OBJECT" \
-  --metadata-from-file startup-script=startup-script.bash
+  --metadata-from-file startup-script=startup-script.bash \
+  --scopes=https://www.googleapis.com/auth/cloud-platform
