@@ -114,12 +114,18 @@ type storer struct {
 	s *storage.Client
 }
 
+type gcsData struct {
+	Timestamp time.Time `json:"timestamp"`
+	Data []float32 `json:"data"`
+}
+
 // update updates the object in GCS with latest data.
 // TODO: Write the object with content/type and cache-control headers.
 func (s storer) update(data []float32) {
 	ctx := context.Background()
-	w := s.s.Bucket(*bucket).Object(*object).NewWriter(ctx)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
+	o := s.s.Bucket(*bucket).Object(*object)
+	w := o.NewWriter(ctx)
+	if err := json.NewEncoder(w).Encode(gcsData{time.Now(), data}); err != nil {
 		log.Println("JSON error: %v", err)
 		return
 	}
@@ -127,5 +133,14 @@ func (s storer) update(data []float32) {
 		log.Println("GCS error: %v", err)
 		return
 	}
+
+	if _, err := o.Update(ctx, storage.ObjectAttrsToUpdate{
+		ContentType: "application/json",
+		CacheControl: "max-age=59", // Cache for <60s.
+	}); err != nil {
+		log.Println("GCS update error: %v", err)
+		return
+	}
+
 	log.Println("Updated GCS")
 }

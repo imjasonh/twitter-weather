@@ -1,0 +1,74 @@
+<html>
+<head>
+  <title>Twitter Weather Report</title>
+  <style>
+h1 {
+  font-size: 50px;
+  text-align: center;
+}
+div {
+  width: 700px;
+  margin: auto;
+  padding: 0;
+}
+  </style>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script type="text/javascript">
+google.charts.load('current', {'packages':['gauge']});
+google.charts.setOnLoadCallback(drawChart);
+var chart = null;
+function drawChart() {
+  chart = new google.visualization.Gauge(document.getElementById('chart_div'));
+  update();
+  setInterval(update, 60000); // Update every minute.
+}
+
+function update() {
+  get(function(resp) {
+    var sum = 0;
+    for (var i = 0; i < resp.data.length; i++) {
+      sum += resp.data[i];
+    }
+    var avg = sum / resp.data.length;
+    console.log('New value:', avg);
+
+    // Translate (-1,1) -> (0,100)
+    var val = (avg*50)+50;
+
+    var data = google.visualization.arrayToDataTable([
+      ['Label', 'Value'],
+      ['Twitter', val],
+    ]);
+
+    var options = {
+      width: 700, height: 700,
+      redFrom: 0, redTo: 10,
+      greenFrom: 90, greenTo: 100,
+      minorTicks: 5
+    };
+
+    chart.draw(data, options);
+  });
+}
+
+function get(cb) {
+  let xhr = new XMLHttpRequest();
+  xhr.open('GET', 'data.json');
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState != 4) { return; }
+    if (xhr.status >= 400) {
+      cb({'error': true});
+      return;
+    }
+    cb(JSON.parse(xhr.responseText));
+  };
+  xhr.send();
+}
+  </script>
+</head>
+<body>
+  <h1>Real-time Twitter Weather</h1>
+  <div id="chart_div"></div>
+</body>
+</html>
