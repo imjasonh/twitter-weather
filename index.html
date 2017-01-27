@@ -1,15 +1,30 @@
 <html>
 <head>
-  <title>Twitter Weather Report</title>
+  <title>Real-time Twitter Happiness Analyzer</title>
   <style>
+body {
+  font-family: Arial, sans-serif;
+}
+
+div#container {
+  width: 800px;
+  margin: auto;
+}
+
 h1 {
-  font-size: 50px;
+  font-size: 40px;
+  text-align: center;
+  margin: 0;
+}
+
+h3 {
   text-align: center;
 }
-div {
-  width: 700px;
-  margin: auto;
-  padding: 0;
+
+div#chart {
+  width: 600px;
+  margin: 0 auto;
+  display: block;
 }
   </style>
   <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -18,7 +33,7 @@ google.charts.load('current', {'packages':['gauge']});
 google.charts.setOnLoadCallback(drawChart);
 var chart = null;
 function drawChart() {
-  chart = new google.visualization.Gauge(document.getElementById('chart_div'));
+  chart = new google.visualization.Gauge(document.getElementById('chart'));
   update();
   setInterval(update, 60000); // Update every minute.
 }
@@ -41,7 +56,7 @@ function update() {
     ]);
 
     var options = {
-      width: 700, height: 700,
+      width: 600, height: 600,
       redFrom: 0, redTo: 10,
       greenFrom: 90, greenTo: 100,
       minorTicks: 5
@@ -68,7 +83,11 @@ function get(cb) {
   </script>
 </head>
 <body>
-  <h1>Real-time Twitter Weather</h1>
-  <div id="chart_div"></div>
+<div id="container">
+  <h1>Real-time Twitter Happiness Analyzer</h1>
+  <div id="chart"></div>
+  <h3>What the hell is this?</h3>
+  <p>This site analyzes tweets in real-time for positive or negative emotional sentiment, using Google's <a href="https://cloud.google.com/natural-language/">Natural Language API</a>. The gauge shows the rolling average of tweets over the last hour, and updates periodically as new tweets are analyzed.</p>
+</div>
 </body>
 </html>
