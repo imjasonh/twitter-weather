@@ -51,7 +51,7 @@ func main() {
 		if metadata.OnGCE() {
 		flagFromMetadata(f.Name)
 	}
-		log.Println(f.Name, f.Value.String())
+		fmt.Println(f.Name, f.Value.String())
 	})
 
 	// TODO: Recover from crashes by reading lastHour from data in GCS.
@@ -97,7 +97,7 @@ func main() {
 	// Wait for SIGINT and SIGTERM (HIT CTRL-C)
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
-	log.Println(<-ch)
+	fmt.Println(<-ch)
 
 	fmt.Println("Stopping Stream...")
 	stream.Stop()
@@ -125,11 +125,11 @@ func (a *analyzer) Analyze(t *twitter.Tweet) {
 		},
 	})
 	if err != nil {
-		log.Println("Analyze error:", err)
+		fmt.Println("Analyze error:", err)
 		return
 	}
 	score := resp.DocumentSentiment.Score
-	log.Println("Sentiment:", score)
+	fmt.Println("Sentiment:", score)
 
 	// Maybe write to BigQuery.
 	a.bq.maybeUpload(score)
@@ -169,10 +169,10 @@ func (b *bigquerier) maybeUpload(i float32) {
 	if len(b.cache) >= *bqCacheSize {
 		u := b.bq.Dataset(*dataset).Table(*table).Uploader()
 		if err := u.Put(ctx, b.cache); err != nil {
-			log.Printf("Error uploading to BigQuery: %v", err)
+			fmt.Printf("Error uploading to BigQuery: %v", err)
 			return
 		}
-		log.Println("Uploaded to BigQuery")
+		fmt.Println("Uploaded to BigQuery")
 		b.cache = nil
 	}
 }
@@ -193,11 +193,11 @@ func (s storer) update(data []float32) {
 	o := s.s.Bucket(*bucket).Object(*object)
 	w := o.NewWriter(ctx)
 	if err := json.NewEncoder(w).Encode(gcsData{time.Now(), data}); err != nil {
-		log.Println("JSON error: %v", err)
+		fmt.Println("JSON error: %v", err)
 		return
 	}
 	if err := w.Close(); err != nil {
-		log.Println("GCS error: %v", err)
+		fmt.Println("GCS error: %v", err)
 		return
 	}
 
@@ -205,9 +205,9 @@ func (s storer) update(data []float32) {
 		ContentType:  "application/json",
 		CacheControl: "max-age=59", // Cache for <60s.
 	}); err != nil {
-		log.Println("GCS update error: %v", err)
+		fmt.Println("GCS update error: %v", err)
 		return
 	}
 
-	log.Println("Updated GCS")
+	fmt.Println("Updated GCS")
 }
